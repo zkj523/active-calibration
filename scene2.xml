@@ -1,0 +1,89 @@
+<mujoco>
+  <visual>
+    <headlight diffuse="0.7 0.7 0.7" ambient="0.4 0.4 0.4" specular="0.1 0.1 0.1"/>
+    <global offwidth="1280" offheight="720"/> <!-- 提高截图分辨率 -->
+    <rgba haze="0.15 0.25 0.35 1.0"/>
+  </visual>
+
+  <asset>
+    <!-- 棋盘格纹理 -->
+    <texture type="2d" name="checkerboard" builtin="checker" 
+             rgb1="0.92 0.92 0.92" rgb2="0.1 0.1 0.1" 
+             width="1024" height="1024" mark="none"/>
+    <material name="checkerboard_mat" texture="checkerboard" texrepeat="5 4" reflectance="0.2"/>
+    
+    <!-- 材质定义 -->
+    <material name="metal_dark" rgba="0.2 0.2 0.2 1.0" reflectance="0.5" shininess="0.8"/>
+    <material name="metal_silver" rgba="0.8 0.8 0.8 1.0" reflectance="0.8" shininess="0.5"/>
+    <material name="lens_glass" rgba="0.1 0.1 0.3 1.0" reflectance="0.9" shininess="1.0"/>
+    <material name="floor_mat" rgba="0.1 0.1 0.15 1.0" reflectance="0.1"/>
+    <material name="frustum_mat" rgba="0 1 1 0.1" shininess="0" emission="0.5"/> <!-- 半透明视锥 -->
+  </asset>
+
+  <worldbody>
+    <light pos="0 0 3" dir="0 0 -1" directional="true" diffuse="0.8 0.8 0.8" castshadow="true"/>
+    <light pos="1 -1 2" dir="-1 1 -1" directional="false" diffuse="0.5 0.5 0.5"/>
+    
+    <!-- 地面 -->
+    <geom name="ground" type="plane" size="2 2 0.1" material="floor_mat"/>
+
+    <!-- ============================================== -->
+    <!-- 1. 标定板 (带底座，显得更真实) -->
+    <!-- ============================================== -->
+    <body name="checkerboard_assembly" pos="0 0 0">
+      <geom name="board_base" type="box" size="0.28 0.23 0.01" pos="0 0 0.01" material="metal_dark"/>
+      <geom name="checkerboard_face" type="box" size="0.25 0.20 0.001" pos="0 0 0.021" material="checkerboard_mat"/>
+      <!-- 这是一个明显的坐标系指示器，展示 Target Frame -->
+      <site name="target_axis_x" type="box" size="0.05 0.002 0.002" pos="0.05 0 0.022" rgba="1 0 0 1"/>
+      <site name="target_axis_y" type="box" size="0.002 0.05 0.002" pos="0 0.05 0.022" rgba="0 1 0 1"/>
+      <site name="target_axis_z" type="box" size="0.002 0.002 0.05" pos="0 0 0.072" rgba="0 0 1 1"/>
+    </body>
+
+    <!-- ============================================== -->
+    <!-- 2. 双目相机模组 (工业风设计 + 视锥可视化) -->
+    <!-- ============================================== -->
+    <body name="stereo_rig" mocap="true" pos="0 0 0.8" euler="0 3.1415 0"> <!-- 初始反转一下朝下 -->
+      
+      <!-- 连接杆 (工业铝型材风格) -->
+      <geom name="mounting_bar" type="box" size="0.12 0.015 0.015" material="metal_silver"/>
+      
+      <!-- ================= 左相机 ================= -->
+      <body name="cam_left_body" pos="-0.05 0 -0.02">
+         <!-- 相机外壳 (Box) -->
+        <geom type="box" size="0.025 0.025 0.04" material="metal_dark"/>
+        <!-- 镜头 (Cylinder) -->
+        <geom type="cylinder" size="0.018 0.01" pos="0 0 -0.04" euler="0 0 0" material="lens_glass"/>
+        <!-- 真正的相机传感器 -->
+        <camera name="camera1_view" mode="fixed" pos="0 0 -0.045" fovy="45" euler="0 3.14 0"/> 
+        
+        <!-- ★★ 视锥可视化 (View Frustum) ★★ -->
+        <!-- 一个半透明的锥体，代表视野范围 -->
+        <geom type="cylinder" size="0.002 0.3" pos="0 0 -0.3" material="frustum_mat" group="1"/> <!-- 中心线 -->
+        <!-- 我们可以做 4 根线代表视锥边缘，或者直接用 mesh，这里用简单的 wireframe 效果 -->
+        <site type="box" size="0.11 0.001 0.001" pos="0 0.11 -0.3" rgba="0 1 1 0.3"/> 
+        <site type="box" size="0.11 0.001 0.001" pos="0 -0.11 -0.3" rgba="0 1 1 0.3"/> 
+        <site type="box" size="0.001 0.11 0.001" pos="0.11 0 -0.3" rgba="0 1 1 0.3"/> 
+        <site type="box" size="0.001 0.11 0.001" pos="-0.11 0 -0.3" rgba="0 1 1 0.3"/> 
+        
+        <!-- 左相机坐标系 -->
+        <site name="camL_axis_z" type="capsule" size="0.003 0.05" pos="0 0 -0.08" rgba="0 0 1 1"/>
+      </body>
+
+      <!-- ================= 右相机 ================= -->
+      <body name="cam_right_body" pos="0.05 0 -0.02">
+        <geom type="box" size="0.025 0.025 0.04" material="metal_dark"/>
+        <geom type="cylinder" size="0.018 0.01" pos="0 0 -0.04" material="lens_glass"/>
+        <camera name="camera2_view" mode="fixed" pos="0 0 -0.045" fovy="45" euler="0 3.14 0"/>
+        
+        <!-- 右相机坐标系 -->
+        <site name="camR_axis_z" type="capsule" size="0.003 0.05" pos="0 0 -0.08" rgba="0 0 1 1"/>
+      </body>
+
+    </body>
+    
+    <!-- 约束空间可视化 (可选，展示规划范围) -->
+    <!-- 一个几乎透明的半球，暗示工作空间 -->
+    <geom type="sphere" size="0.8" pos="0 0 0" material="frustum_mat" rgba="1 0 0 0.03" group="2"/>
+
+  </worldbody>
+</mujoco>
